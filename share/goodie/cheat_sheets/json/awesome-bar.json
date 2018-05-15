@@ -1,6 +1,7 @@
 {
     "name": "Firefox Awesome Bar",
     "id": "awesome_bar_cheat_sheet",
+    "description": "The Firefox location bar, also called the URL bar or address bar, displays a site's web address (URL).",
     "metadata": {
         "sourceName": "Mozilla Support",
         "sourceUrl": "https://support.mozilla.org/kb/awesome-bar-keyboard-shortcuts"
@@ -12,6 +13,9 @@
     "section_order": ["Power-ups"],
     "sections": {
         "Power-ups": [{
+            "val": "Brings focus to Awesome bar",
+            "key": "[Ctrl] [L]"
+        }, {
             "val": "Search for matches in your browsing history",
             "key": "^"
         }, {

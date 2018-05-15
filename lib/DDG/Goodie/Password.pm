@@ -4,22 +4,17 @@ package DDG::Goodie::Password;
 use strict;
 use DDG::Goodie;
 
+use Crypt::URandom qw( urandom );
+
 use List::MoreUtils qw( none );
 use List::Util qw( min max first );
 use Scalar::Util qw( looks_like_number );
 
-primary_example_queries 'random password', 'random password strong 15';
-description 'generates a random password';
-name 'Password';
-code_url 'https://github.com/duckduckgo/zeroclickinfo-goodies/blob/master/lib/DDG/Goodies/Password.pm';
-attribution github => ['duckduckgo', 'DuckDuckGo'];
-category 'computing_tools';
-topics 'cryptography';
-
 zci answer_type => 'pw';
 zci is_cached   => 0;
 
-triggers start => 'password', 'random password', 'pw', 'random pw', 'pwgen';
+triggers start => 'random password', 'generate password', 'generate random password', 'password generator', 'pw', 'generate pw', 'random pw', 'pwgen';
+triggers startend => 'password';
 
 use constant MAX_PWD_LENGTH => 64;
 use constant MIN_PWD_LENGTH => 8;
@@ -47,13 +42,18 @@ foreach my $value (values %pw_strengths) {
 
 my $strengths = join('|', keys %pw_strengths);
 
+
 handle remainder => sub {
 
-    my $query = shift;
-
+    my $query = lc(shift);
+    
+    # Remove stopwords from remainder before checking format
+    my @stopwords = ('generate', 'generator', 'random', 'characters', 'create');
+    for my $stopwd (@stopwords) {
+        $query =~ s/$stopwd//;
+    }
+    
     return if ($query && $query !~ /^(?<fw>\d+|$strengths|)\s*(?<sw>\d+|$strengths|)$/i);
-
-    srand();                           # Reseed on each request.
 
     my @q_words = map { lc $_ } grep { defined } ($+{'fw'}, $+{'sw'});
 
@@ -72,7 +72,7 @@ handle remainder => sub {
 
     # Generate random password of the correct length.
     while (scalar @pwgen < $pw_length) {
-        push @pwgen, $list_to_use[int rand scalar @list_to_use];
+        push @pwgen, $list_to_use[saferandom(scalar @list_to_use)];
     }
     if ($pw_strength ne 'low') {
         # Make sure we have the characters we want;
@@ -83,12 +83,15 @@ handle remainder => sub {
     my $pw_string = join('', @pwgen);
 
     # Add password for display.
-    return $pw_string . " (random password)",
-      structured_answer => {
-        input     => [$pw_length . ' characters', $pw_strength . ' strength'],
-        operation => 'Random password',
-        result    => $pw_string
-      };
+    return "$pw_string (random password)", structured_answer => {
+        data => {
+            title => $pw_string,
+            subtitle => "Random password: $pw_length characters, $pw_strength strength"
+        },
+        templates => {
+            group => 'text'
+        }
+    };
 };
 
 sub replace_inside_with {
@@ -98,8 +101,13 @@ sub replace_inside_with {
 
     # replace a random character in the original list with
     # with a randomly selected key from our hash.
-    $orig->[int rand scalar @$orig] = $keys[int rand scalar @keys];
+    $orig->[saferandom(scalar @$orig)] = $keys[saferandom(scalar @keys)];
     return;
+}
+
+sub saferandom {
+    my ($range) = @_;
+    return unpack("L", urandom(4)) % $range;
 }
 
 1;

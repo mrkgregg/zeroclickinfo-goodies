@@ -10,25 +10,12 @@ use DDG::GoodieRole::Dates;
 use DateTime;
 use POSIX qw(fmod);
 
-attribution github => ['GlitchMr', 'GlitchMr'],
-            github => ['https://github.com/samph',   'samph'],
-            github => 'cwallen';
+my %timezones = DDG::GoodieRole::Dates::get_timezones();
 
-
-primary_example_queries '10:00AM MST to PST';
-secondary_example_queries '19:00 UTC to EST', '1am UTC to PST';
-description 'convert times between timezones';
-name 'Timezone Converter';
-code_url 'https://github.com/duckduckgo/zeroclickinfo-goodies/blob/master/lib/DDG/Goodie/TimezoneConverter.pm';
-category 'calculations';
-topics 'travel';
-
-triggers any => qw(in into to);
+triggers any => lc for keys %timezones;
 
 zci is_cached   => 1;
 zci answer_type => 'timezone_converter';
-
-my %timezones = DDG::GoodieRole::Dates::get_timezones();
 
 my $default_tz   = 'UTC';
 my $localtime_re = qr/(?:(?:my|local|my local)\s*time(?:zone)?)/i;
@@ -36,15 +23,14 @@ my $timezone_re  = qr/(?:\w+(?:\s*[+-]0*[0-9]{1,5}(?::[0-5][0-9])?)?|$localtime_
 
 sub parse_timezone {
     my $timezone = shift;
-
-    # They said "my timezone" or similar.
-    if ($timezone =~ /$localtime_re/i) {
+    
+    # They said "my timezone" or nothing at all.
+    if (!defined($timezone) || !$timezone || $timezone =~ /$localtime_re/i) {
         my $dt = DateTime->now(time_zone => $loc->time_zone || $default_tz );
         return ($dt->time_zone_short_name, $dt->offset / 3600);
     }
 
     # Normalize
-    $timezone ||= $default_tz;
     $timezone = uc $timezone;
     $timezone =~ s/\s+//g;
 
@@ -60,7 +46,10 @@ sub parse_timezone {
     $minutes //= 0;
 
     my $hour = int( $timezones{$name} / 100 );
-    $minutes += $timezones{$name} % 100;
+    # To avoid modulo of negative numbers
+    my $m = abs( $timezones{$name} ) % 100;
+    $m *= -1 if $timezones{$name} < 0;
+    $minutes += $m;
 
     return ($timezone, $hour + $modifier + $minutes / 60);
 }
@@ -70,6 +59,7 @@ sub to_time {
 
     my $pm = "";
     my $seconds = 3600 * fmod $hours, 1 / 60;
+    my $time_word = "";
 
     # I'm using floating point numbers. They sometimes don't do what I want.
     if ( sprintf( '%.5f', $seconds ) == 60 ) {
@@ -77,18 +67,24 @@ sub to_time {
     }
     my $minutes
         = ( $hours - int $hours ) * 60 - sprintf( '%.4f', $seconds ) / 60;
+
     my $seconds_format = int $seconds ? ':%02.0f' : "";
     if ($american) {
-        # Special case certain hours
-        return 'midnight' if $hours == 0;
-        return 'noon'     if $hours == 12;
+        if ($hours == 0) {
+            $time_word = 'Midnight - ';
+        } elsif ($hours == 12) {
+            $time_word = 'Noon - ';
+        }
+
         $pm = ' AM';
-        if ($hours > 12) {
+        if ($hours >= 12) {
             $pm = ' PM';
             $hours -= 12 if (int($hours) > 12);
+        } elsif ($hours == 0) {
+            $hours = 12;
         }
     }
-    sprintf "%i:%02.0f$seconds_format$pm", $hours, $minutes, $seconds;
+    sprintf "$time_word%i:%02.0f$seconds_format$pm", $hours, $minutes, $seconds;
 }
 
 handle query => sub {
@@ -111,7 +107,7 @@ handle query => sub {
           # Optional spaces between tokens
           \s*
           # AM/PM
-          (?<american>(?:A|(?<pm>P))\.?M\.?)?
+          (?<american>(?:(?<am>A)|(?<pm>P))\.?M\.?)?
         # Spaces between tokens
         \s* \b
         # Optional "from" indicator for input timezone
@@ -119,19 +115,19 @@ handle query => sub {
         # Optional input timezone
         (?<from_tz>$timezone_re)
         # Spaces
-        \s+
+        (?:\s+
         # in keywords
         (?: IN (?: TO )? | TO )
         # Spaces
         \s+
         # Output timezone
-        (?<to_tz>$timezone_re)
+        (?<to_tz>$timezone_re))?
         \s* \z
     }ix or return;
 
     my ($hours, $minutes, $seconds) = map { $_ // 0 } ($+{'h'}, $+{'m'}, $+{'s'});
     my $american        = $+{'american'};
-    my $pm              = ($+{'pm'} && $hours != 12) ? 12 : (!$+{'pm'} && $hours == 12) ? -12 : 0;
+    my $pm              = ($+{'pm'} && $hours != 12) ? 12 : ($+{'am'} && $hours == 12) ? -12 : 0;
 
     my $input = {};
     my $output = {};
@@ -146,6 +142,7 @@ handle query => sub {
     for ( $input->{gmt_timezone}, $output->{gmt_timezone} ) {
         $_ = to_time $_;
         s/\A\b/+/;
+        s/:-\b/:/;
         s/:00\z//;
     }
 
@@ -187,9 +184,16 @@ handle query => sub {
             ucfirst $output->{time}, $output->{timezone}, $output->{days};
 
     return $output_string, structured_answer => {
-        input     => [html_enc($input_string)],
-        operation => 'Convert Timezone',
-        result    => html_enc($output_string),
+        data => {
+            title => $output_string,
+            subtitle => "Convert Timezone: $input_string"
+        },
+        templates => {
+            group => 'text',
+            options => {
+                moreAt => 0,
+            }
+        }
     };
 };
 

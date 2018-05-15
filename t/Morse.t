@@ -4,35 +4,47 @@ use strict;
 use warnings;
 use utf8;
 use Test::More;
+use Test::Deep;
 use DDG::Test::Goodie;
 
 zci answer_type => 'morse';
 zci is_cached   => 1;
 
+my $sos  = '... --- ...';
+my $duck = '.... . .-.. .-.. --- --..--  -.. ..- -.-. -.-';
 
-my @sos = ('... --- ...', structured_answer => { input => ['SOS'], operation => 'Morse code conversion', result => '... --- ...'});
-my @duck = ('.... . .-.. .-.. --- --..--  -.. ..- -.-. -.-', structured_answer => { input => ['hello, duck'], operation => 'Morse code conversion', result => '.... . .-.. .-.. --- --..--  -.. ..- -.-. -.-'});
-
-ddg_goodie_test([qw(
-          DDG::Goodie::Morse
-          )
-    ],
-    'morse ... --- ...' => test_zci(
-        'SOS',
-        structured_answer => {
-            input     => ['... --- ...'],
-            operation => 'Morse code conversion',
-            result    => 'SOS'
+sub build_test {
+    my ($text, $title, $subtitle) = @_;
+    return test_zci($text, structured_answer => {
+        data => {
+            title => $title,
+            subtitle => "Morse code conversion: $subtitle"
+        },
+        templates => {
+            group => 'text'
         }
-    ),
-    'morse SOS'              => test_zci(@sos),
-    'morse code SOS'         => test_zci(@sos),
-    'SOS morse'              => test_zci(@sos),
-    'SOS morse code'         => test_zci(@sos),
-    'morse hello, duck'      => test_zci(@duck),
-    'morse code hello, duck' => test_zci(@duck),
-    'morse code cheatsheet' => undef,
-    'morse code cheat sheet' => undef,
+    });
+}
+
+ddg_goodie_test(
+    [qw(DDG::Goodie::Morse)],
+    'morse code for ... --- ...'    => build_test("SOS", "SOS", $sos),
+    'morse code for SOS'            => build_test($sos, $sos, "SOS"),
+    'morse for SOS'                 => build_test($sos, $sos, "SOS"),
+    'SOS to morse code'             => build_test($sos, $sos, "SOS"),
+    'SOS to morse'                  => build_test($sos, $sos, "SOS"),
+    'morse code for hello, duck'    => build_test($duck, $duck, "hello, duck"),
+    'hello, duck to morse code'     => build_test($duck, $duck, "hello, duck"),
+    'morse for hello, duck'         => build_test($duck, $duck, "hello, duck"),
+    'hello, duck to morse'          => build_test($duck, $duck, "hello, duck"),
+    'morse SOS'                     => undef,
+    'morse code SOS'                => undef,
+    'SOS morse'                     => undef,
+    'SOS morse code'                => undef,
+    'morse hello, duck'             => undef,
+    'morse code hello, duck'        => undef,
+    'morse code for cheatsheet'     => undef,
+    'morse code for cheat sheet'    => undef,
 );
 
 done_testing;

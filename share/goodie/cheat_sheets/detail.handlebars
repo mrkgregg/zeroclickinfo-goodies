@@ -2,7 +2,7 @@
 <h4 class="c-base__sub">{{description}}</h4>
 
 <div class="cheatsheet__container compressed" >
-    {{#cheatsheets_ordered sections section_order template_type}}
+    {{#cheatsheets_ordered sections section_order columns template_type}}
       <div class="cheatsheet__section {{template.type}}{{#if showhide}} showhide is-hidden {{/if}}">
       <h6 class="cheatsheet__title tx-clr--slate">{{name}}</h6>
         {{{include template.path}}}
@@ -11,7 +11,7 @@
 </div>
 
 <div class="cheatsheet__footer c-list__links">
-    <a class="c-list__link  chomp--link  sep--after can-expand">
+    <a class="c-list__link  chomp--link  {{#if metadata.sourceUrl}}sep--after{{/if}} can-expand">
         <i class="chomp--link__icn"></i>
         <span class="chomp--link__mr">Show More</span>
         <span class="chomp--link__ls">Show Less</span>
